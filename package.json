@@ -1,0 +1,20 @@
+{
+  "name": "react-native-ios-image-picker",
+  "version": "0.0.3",
+  "description": "A React Native module that allows you to use native UI to select some photos from the device library",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "nativePackage": true,
+  "author": "TF",
+  "keywords": [
+    "react-native",
+    "react-native-ios-image-picker",
+    "react",
+    "native",
+    "image",
+    "picker"
+  ]
+}
