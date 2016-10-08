@@ -26,21 +26,21 @@ class choosePhoto extends Component {
 	state = {
 	    avatarSource: null
 	 };
-	 
-	 
+
+
 	 // 从照片库选图片
-	 selectPhotoFromLibrary() {
+	 selectPhotoFromLibrary(maxNum) {
 	   // 设置选取照片需要的参数
-	   /*  
+	   /*
          title: '照片选取',   // ActionSheet标题
          takePhotoButtonTitle: '拍照',  // 拍照按钮标题
          chooseFromLibraryButtonTitle: '从手机相册选取',  //相册按钮标题
         */
 	   const options = {
-         maxNumOfSelect: 3,  // 照片最大选取数
+         maxNumOfSelect: maxNum,  // 照片最大选取数
          quality: 0.5,  // 照片压缩率，按照像素压缩
          maxWidth: 600,  // 最大尺寸宽度
-         maxHeight: 600, // 最大尺寸高度 
+         maxHeight: 600, // 最大尺寸高度
          listNavigationBarOptions:{ // 缩略图页面，上导航条的设置项
            backgroundColor:'#000000',  // 上导航栏的背景颜色，默认为纯黑色
            alpha:0.8,  // 设置上导航视图的透明度，默认为0.8
@@ -66,19 +66,32 @@ class choosePhoto extends Component {
          storageOptions: {  // 存储的设置项
           skipBackup: true,  // 默认true表示跳过备份到iCloud和iTunes,一般应用中不包含用户的数据的文件无须备份
           path:'savePhotoPath' // 创建存储的文件夹路径，图片保存在沙盒caches下的文件夹名称
-         }
+        },
+        cropOptions: { // 裁剪项设置
+          showMidLines: true,  // 是否显示中间的拖拽
+          cropAreaCornerWidth: 20,  // 设置角拖拽区的宽度
+          cropAreaCornerHeight: 20,  // 设置角拖拽区的高度
+          cropAreaCornerLineWidth: 2,  // 设置角框的宽度
+          cropAreaBorderLineWidth: 2,  // 设置选取框的宽度
+          cropAreaMidLineWidth: 40,  // 设置中间拖拽区的宽度
+          cropAreaMidLineHeight: 2,  // 设置中间拖拽区的高度
+          minSpace: 10,  // 设置选取区的最小尺寸，最小区域
+          cropAreaBorderLineColor: '#808080', // 选取区域边框框的颜色, 默认灰色
+          cropAreaCornerLineColor: '#FFFFFF', // 设置角拖拽视图的颜色， 默认白色
+          cropAreaMidLineColor: '#FFFFFF', // 设置中间拖拽视图的颜色, 默认白色
+        }
        };
-       
+
        // 调用oc方法，将设置的参数传入，将选取后的数据回调回来
        ImagePickerManager.showImagePicker(options, (response) => {
 	       console.log('Response = ', response);
 	       if(response.error) {
-		       console.log('图片选取错误：', response.error);	          
+		       console.log('图片选取错误：', response.error);
 	       } else if(response.didCancel) {
 		       console.log('用户取消了图片选取');
 	       } else if(response.denied) {
 		       console.log('没有设置访问照片库权限');
-	       } else {  
+	       } else {
 	          // 将选取的正确信息返回
 	          /*
 		        用户选择完成照片之后返回的数据格式如下所示:
@@ -114,26 +127,40 @@ class choosePhoto extends Component {
 	       }
        });
 	 }
-	 
-	 
+
+
   // 拍照
-  selectPhotoFromCamera() {
+  selectPhotoFromCamera(cropping) {
     const options = {
       quality: 0.5,  // 照片压缩率，按照像素压缩
       maxWidth: 600,  // 最大尺寸宽度
       maxHeight: 600, // 最大尺寸高度
-      allowsEditing: true, // 是否允许编辑 
-      saveAlbum: true,  // 是否允许保存到系统相册
+      allowsEditing: false, // 是否允许编辑
+      saveAlbum: false,  // 是否允许保存到系统相册
       imageFileType: 'png', // 指定图片的保存本地类型
       storageOptions: {  // 存储的设置项
         skipBackup: true,  // 默认true表示跳过备份到iCloud和iTunes,一般应用中不包含用户的数据的文件无须备份
         path:'savePhotoPath' // 创建存储的文件夹路径，图片保存在沙盒caches下的文件夹名称
+      },
+      cropping: cropping, //是否裁剪
+      cropOptions: { // 裁剪项设置
+        showMidLines: true,  // 是否显示中间的拖拽
+        cropAreaCornerWidth: 20,  // 设置角拖拽区的宽度
+        cropAreaCornerHeight: 20,  // 设置角拖拽区的高度
+        cropAreaCornerLineWidth: 2,  // 设置角框的宽度
+        cropAreaBorderLineWidth: 2,  // 设置选取框的宽度
+        cropAreaMidLineWidth: 40,  // 设置中间拖拽区的宽度
+        cropAreaMidLineHeight: 2,  // 设置中间拖拽区的高度
+        minSpace: 10,  // 设置选取区的最小尺寸，最小区域
+        cropAreaBorderLineColor: '#808080', // 选取区域边框框的颜色, 默认灰色
+        cropAreaCornerLineColor: '#FFFFFF', // 设置角拖拽视图的颜色， 默认白色
+        cropAreaMidLineColor: '#FFFFFF', // 设置中间拖拽视图的颜色, 默认白色
       }
     };
     ImagePickerManager.phoneFromCamera(options,(response) => {
 	  console.log('respone', response)
 	  if(response.error) {
-	    console.log('图片选取错误：', response.error);	          
+	    console.log('图片选取错误：', response.error);
 	  } else if(response.didCancel) {
 	    console.log('用户取消了图片选取');
 	  } else if(response.denied) {
@@ -146,28 +173,34 @@ class choosePhoto extends Component {
 	  }
     })
   }
-	 
+
    // 在js端显示选择菜单
 	 showActionSheet() {
-	     var cp = this; // 在回调函数中不能传this，需要临时变量 
+	     var cp = this; // 在回调函数中不能传this，需要临时变量
 		 ActionSheetIOS.showActionSheetWithOptions({
-			 options:['拍照', '从手机相册选取', '取消'],
-			 cancelButtonIndex: 3,
+			 options:['拍照', "拍照 裁剪", '从手机相册选取多张', '从手机相册选取1张 裁剪', '取消'],
+			 cancelButtonIndex: 4,
 /* 			 destructiveButtonIndex: 0, */
 		 }, function(index){
-		     if(index == 0){
-			     cp.selectPhotoFromCamera();
+		     if(index == 0) {
+			     cp.selectPhotoFromCamera(false);
 		     }
-			 else if(index == 1) {
-				 cp.selectPhotoFromLibrary();
-			 }
+         else if(index == 1) {
+           cp.selectPhotoFromCamera(true);
+         }
+			   else if(index == 2) {
+				   cp.selectPhotoFromLibrary(5);
+			   }
+         else if(index == 3) {
+				   cp.selectPhotoFromLibrary(1);
+			   }
 		 });
 	 }
-	 
-	 
+
+
     // 渲染视图
     render() {
-    
+
 	  return (
 	      <View style={styles.container}>
 	        <TouchableOpacity onPress={this.showActionSheet.bind(this)}>

@@ -13,9 +13,14 @@
 #import <AssetsLibrary/ALAssetRepresentation.h>
 #import <ImageIO/CGImageSource.h>
 #import <ImageIO/CGImageProperties.h>
+#import "CaptureViewController.h"
 
 
-@interface TFImagePickerViewController () <UICollectionViewDataSource, UICollectionViewDelegate>
+@interface TFImagePickerViewController () <UICollectionViewDataSource, UICollectionViewDelegate> {
+    NSString *_path;  // 单张照片的保存的路径
+    NSDictionary *_oldExifDic; // 单张照片的原始的exif信息
+    NSString *_fileName;  // 单张照片的文件名
+}
 
 @property (nonatomic, strong) ALAssetsLibrary *assetsLibrary; // 设置成属性，防止生命周期提前结束
 @property (nonatomic, strong) NSMutableArray *imagesArray;  // 用来保存相册中取出的照片
@@ -341,8 +346,8 @@
     
     // 遍历选中的位置数组，找到所有被选中的图片
     for (NSNumber *index in self.indexArray) {
+        
         NSDictionary *content = [self.imagesArray objectAtIndex:index.integerValue];
-        NSMutableDictionary *response = [NSMutableDictionary dictionaryWithCapacity:0];
         
         // 获取图片信息
         ALAssetRepresentation *assertRepresentation = [[content objectForKey:@"result"] defaultRepresentation];
@@ -392,6 +397,10 @@
         NSDictionary *nDic = [self getExifDataFromImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:fileURL]]];
         // 将信息追加到exifDic中
         [exifDic addEntriesFromDictionary:nDic];
+        
+        
+        // 创建返回对象
+        NSMutableDictionary *response = [NSMutableDictionary dictionaryWithCapacity:0];
         
         [response setObject:exifDic forKey:@"exif"];
         
@@ -706,18 +715,118 @@
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
   
-  TFBigImageViewController *bigImageVC = [[TFBigImageViewController alloc] init];
-  bigImageVC.currentPageIndex = indexPath.row;
-  bigImageVC.allPhotos = self.imagesArray;
-  bigImageVC.imagePickerVC = self;
-    
-  // block回调，在大图中选择时刷新对应的cell
-  bigImageVC.selectImg = ^(NSInteger currentIndex) {
-    [collectionView reloadItemsAtIndexPaths:@[[NSIndexPath indexPathForRow:currentIndex inSection:0]]];
-  };
-  [self.navigationController pushViewController:bigImageVC animated:YES];
-  
+    if (self.maxNumOfSelection == 1) {
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cropOKNotificationHandler:) name: @"CropOK" object: nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cropCancelNotificationHandler:) name: @"CropCancel" object: nil];
+        
+        NSDictionary *content = [self.imagesArray objectAtIndex:indexPath.row];
+        
+        // 获取图片信息
+        ALAssetRepresentation *assertRepresentation = [[content objectForKey:@"result"] defaultRepresentation];
+        
+        // 获取图片信息
+        UIImage *img = [UIImage imageWithCGImage:[assertRepresentation fullScreenImage]];
+        
+        // 获取原始图片信息
+        _oldExifDic = [self getExifDataFromALAsset:[content objectForKey:@"result"]];
+        _fileName = assertRepresentation.filename;
+        // 保存图片
+        _path = [self saveImageAtPathWithName:assertRepresentation.filename];
+        if (!_path) {
+            // 如果图片路径不存在，返回错误信息， 错误信息在保存方法中回调
+            return;
+        }
+        
+        CaptureViewController *captureView = [[CaptureViewController alloc] init];
+        captureView.image = img;
+        
+        // 裁剪设置项
+        NSDictionary *cropOptions = [self.options objectForKey:@"cropOptions"];
+        if (cropOptions && [cropOptions isKindOfClass:[NSDictionary class]]) {
+            captureView.cropOptions = cropOptions;
+        }
+        
+        [self.navigationController pushViewController:captureView animated:YES];
+    } else {
+        TFBigImageViewController *bigImageVC = [[TFBigImageViewController alloc] init];
+        bigImageVC.currentPageIndex = indexPath.row;
+        bigImageVC.allPhotos = self.imagesArray;
+        bigImageVC.imagePickerVC = self;
+        
+        // block回调，在大图中选择时刷新对应的cell
+        bigImageVC.selectImg = ^(NSInteger currentIndex) {
+            [collectionView reloadItemsAtIndexPaths:@[[NSIndexPath indexPathForRow:currentIndex inSection:0]]];
+        };
+        [self.navigationController pushViewController:bigImageVC animated:YES];
+    }
 }
+
+- (void)cropCancelNotificationHandler:(NSNotification *)notification {
+//    self.selectFinish(@{@"didCancel": @YES});
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropOK" object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropCancel" object:nil];
+    [self.navigationController popViewControllerAnimated:YES];
+}
+- (void)cropOKNotificationHandler:(NSNotification *)notification {
+    UIImage *image = (UIImage *)notification.object;
+    
+    // 创建返回对象
+    NSMutableDictionary *response = [NSMutableDictionary dictionaryWithCapacity:0];
+    // 创建返回exif信息的对象
+    NSMutableDictionary *exifDic = [NSMutableDictionary dictionaryWithDictionary:_oldExifDic];
+    
+    // 按像素率来压缩
+    NSData *data;
+    if ([_fileName hasSuffix:@"png"] || [_fileName hasSuffix:@"PNG"]) {
+        data = UIImagePNGRepresentation(image);
+    } else {
+        data = UIImageJPEGRepresentation(image, [[self.options valueForKey:@"quality"] floatValue]);
+    }
+    
+    // 将图片信息写入文件中
+    [data writeToFile:_path atomically:YES];
+    NSURL *fileURL = [NSURL fileURLWithPath:_path];
+    
+    // 获取压缩后的图片的exif信息
+    NSDictionary *nDic = [self getExifDataFromImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:fileURL]]];
+    // 将信息追加到exifDic中
+    [exifDic addEntriesFromDictionary:nDic];
+    [response setObject:exifDic forKey:@"exif"];
+    
+    // 封装返回数据
+    [response setObject:[fileURL absoluteString] forKey:@"uri"];
+    [response setObject:@(image.size.width) forKey:@"width"];
+    [response setObject:@(image.size.height) forKey:@"height"];
+    NSNumber *fileSizeValue = nil;
+    NSError *fileSizeError = nil;
+    [fileURL getResourceValue:&fileSizeValue forKey:NSURLFileSizeKey error:&fileSizeError];
+    if (fileSizeValue){
+        [response setObject:fileSizeValue forKey:@"fileSize"];
+    }
+    
+    // 是否备份到iclod
+    if ([self.options objectForKey:@"storageOptions"] && [[self.options objectForKey:@"storageOptions"] isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *storageOptions = [self.options objectForKey:@"storageOptions"];
+        
+        if ([[storageOptions objectForKey:@"skipBackup"] boolValue]) {
+            [self addSkipBackupAttributeToItemAtPath:_path];  // 跳过iCloud备份
+        }
+    }
+    
+    // 创建数组对象，用来保存返回给js的数据
+    NSMutableArray *results = [NSMutableArray arrayWithCapacity:0];
+    [results addObject:response];
+    
+    // 选择完成后将数据回调给js
+    [self dismissViewControllerAnimated:YES completion:^{
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropOK" object:nil];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropCancel" object:nil];
+        self.selectFinish(@{@"numOfSelect":@(1), @"results":results});
+    }];
+}
+
+
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];

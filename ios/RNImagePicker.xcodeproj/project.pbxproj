@@ -10,6 +10,8 @@
 		195FC3B01D20ACA000434690 /* TFBigImageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 195FC3AB1D20ACA000434690 /* TFBigImageViewController.m */; };
 		195FC3B21D20ACA000434690 /* TFImagePickerViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 195FC3AF1D20ACA000434690 /* TFImagePickerViewController.m */; };
 		195FC4D51D229BA300434690 /* UIColor+hex.m in Sources */ = {isa = PBXBuildFile; fileRef = 195FC4D41D229BA300434690 /* UIColor+hex.m */; };
+		19AC4E821D9D03120027350D /* TKImageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 19AC4E811D9D03120027350D /* TKImageView.m */; };
+		19AC4E851D9D06380027350D /* CaptureViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 19AC4E841D9D06380027350D /* CaptureViewController.m */; };
 		19E6BABE1D24B24A00AEC6FF /* TFImagePickerManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 19E6BABD1D24B24A00AEC6FF /* TFImagePickerManager.m */; };
 /* End PBXBuildFile section */
 
@@ -34,6 +36,10 @@
 		195FC46E1D2201EF00434690 /* RNImage.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = RNImage.bundle; sourceTree = "<group>"; };
 		195FC4D31D229BA300434690 /* UIColor+hex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIColor+hex.h"; sourceTree = "<group>"; };
 		195FC4D41D229BA300434690 /* UIColor+hex.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIColor+hex.m"; sourceTree = "<group>"; };
+		19AC4E801D9D03120027350D /* TKImageView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TKImageView.h; sourceTree = "<group>"; };
+		19AC4E811D9D03120027350D /* TKImageView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TKImageView.m; sourceTree = "<group>"; };
+		19AC4E831D9D06380027350D /* CaptureViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CaptureViewController.h; sourceTree = "<group>"; };
+		19AC4E841D9D06380027350D /* CaptureViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CaptureViewController.m; sourceTree = "<group>"; };
 		19E6BABC1D24B24A00AEC6FF /* TFImagePickerManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TFImagePickerManager.h; sourceTree = "<group>"; };
 		19E6BABD1D24B24A00AEC6FF /* TFImagePickerManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TFImagePickerManager.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -61,6 +67,10 @@
 				195FC3AB1D20ACA000434690 /* TFBigImageViewController.m */,
 				195FC4D31D229BA300434690 /* UIColor+hex.h */,
 				195FC4D41D229BA300434690 /* UIColor+hex.m */,
+				19AC4E831D9D06380027350D /* CaptureViewController.h */,
+				19AC4E841D9D06380027350D /* CaptureViewController.m */,
+				19AC4E801D9D03120027350D /* TKImageView.h */,
+				19AC4E811D9D03120027350D /* TKImageView.m */,
 				014A3B5D1C6CF33500B6D375 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -133,6 +143,8 @@
 				195FC4D51D229BA300434690 /* UIColor+hex.m in Sources */,
 				195FC3B21D20ACA000434690 /* TFImagePickerViewController.m in Sources */,
 				19E6BABE1D24B24A00AEC6FF /* TFImagePickerManager.m in Sources */,
+				19AC4E821D9D03120027350D /* TKImageView.m in Sources */,
+				19AC4E851D9D06380027350D /* CaptureViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

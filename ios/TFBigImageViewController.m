@@ -311,6 +311,7 @@
       imgScrollView.showsVerticalScrollIndicator = NO;
       imgScrollView.delegate = self;
       
+      
       // 创建图片视图对象，显示照片
       UIImageView *contentView = (UIImageView *)[imgScrollView viewWithTag:2000 + counter];
       if (!contentView) {
@@ -327,7 +328,10 @@
       // 设置视图大小
       imgScrollView.frame = CGRectMake(ScreenWidth * counter, 0, ScreenWidth, ScreenHeight);
       CGFloat scale = img.size.height / img.size.width;
+      
       contentView.center = CGPointMake(ScreenWidth*0.5, ScreenHeight *0.5);
+//      contentView.center = CGPointMake(imgScrollView.center.x - ScreenWidth * counter, ScreenHeight *0.5);
+      
       contentView.bounds = CGRectMake(0, 0, ScreenWidth, ScreenWidth *scale);
     
       [imgScrollView addSubview:contentView];
@@ -393,10 +397,12 @@
                 if ([UIScreen mainScreen].bounds.size.height < scrollView.contentSize.height) {
                     view.frame = CGRectMake(view.frame.origin.x, 0, view.frame.size.width, view.frame.size.height);
                 } else {
-                    view.center = CGPointMake(ScreenWidth * 0.5, ScreenHeight * 0.5);
+//                    view.center = CGPointMake(ScreenWidth * 0.5, ScreenHeight * 0.5);
+                    view.center = CGPointMake(view.center.x, ScreenHeight * 0.5);
                 }
             } else {
-                view.center = CGPointMake(ScreenWidth * 0.5, ScreenHeight * 0.5);
+//                view.center = CGPointMake(ScreenWidth * 0.5, ScreenHeight * 0.5);
+                view.center = CGPointMake(view.center.x, ScreenHeight * 0.5);
             }
         }];
     }

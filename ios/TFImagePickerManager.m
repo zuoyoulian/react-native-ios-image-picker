@@ -11,10 +11,15 @@
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <ImageIO/CGImageSource.h>
 #import <ImageIO/CGImageProperties.h>
+#import "CaptureViewController.h"
 
 @import MobileCoreServices;
 
-@interface TFImagePickerManager () <UINavigationControllerDelegate, UIImagePickerControllerDelegate>
+@interface TFImagePickerManager () <UINavigationControllerDelegate, UIImagePickerControllerDelegate> {
+    NSString *_path;  // 拍照保存的路径
+    NSDictionary *_oldExifDic; // 原始照片的exif信息
+    UIImagePickerController *_picker;  // 照相
+}
 
 
 @property (nonatomic, copy) RCTResponseSenderBlock callback;
@@ -71,6 +76,13 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
     self.callback = callback;
     self.options = options;
     
+    
+    if (([[self.options objectForKey:@"cropping"] boolValue])) {
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cropOKNotificationHandler:) name: @"CropOK" object: nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cropCancelNotificationHandler:) name: @"CropCancel" object: nil];
+    }
+    
+    
     //先设定sourceType为相机，然后判断相机是否可用，不可用将直接跳出，并返回不可用
     UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera;
     if (![UIImagePickerController isSourceTypeAvailable: UIImagePickerControllerSourceTypeCamera]) {
@@ -78,17 +90,17 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
         self.callback(@[@{@"denied": @YES}]);
         return;
     }
-    UIImagePickerController *picker = [[UIImagePickerController alloc] init];//初始化
-    picker.delegate = self;
+    _picker = [[UIImagePickerController alloc] init];//初始化
+    _picker.delegate = self;
     if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
-        picker.allowsEditing = YES;//设置可编辑
+        _picker.allowsEditing = YES;//设置可编辑
     }
-    picker.sourceType = sourceType;
-    picker.mediaTypes = @[(NSString *)kUTTypeImage];  // 设置媒体访问类型
+    _picker.sourceType = sourceType;
+    _picker.mediaTypes = @[(NSString *)kUTTypeImage];  // 设置媒体访问类型
     
     // 获取根视图控制器
     UIViewController *controller = [[[UIApplication sharedApplication] keyWindow] rootViewController];
-    [controller presentModalViewController:picker animated:YES];//进入照相界面
+    [controller presentModalViewController:_picker animated:YES];//进入照相界面
 }
 
 // 照相机选取照片
@@ -112,40 +124,15 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
         fileName = videoURL.lastPathComponent;
     }
     
-    // 默认保存tmp文件夹
-    NSString *path = [[NSTemporaryDirectory()stringByStandardizingPath] stringByAppendingPathComponent:fileName];
     
-    if ([self.options objectForKey:@"storageOptions"] && [[self.options objectForKey:@"storageOptions"] isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *storageOptions = [self.options objectForKey:@"storageOptions"];
-        
-        //获取cache的路径
-        NSString *cache = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject];
-        
-        // 对path的值进行判断， path表示在外部规定图片存储的位置
-        if ([storageOptions objectForKey:@"path"]) {
-            // 如果path存在，在caches中创建文件夹路径
-            NSString *newPath = [cache stringByAppendingPathComponent:[storageOptions objectForKey:@"path"]];
-            NSError *error;
-            // 创建文件夹，如果文件夹存在，不需要创建
-            if (![[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
-                [[NSFileManager defaultManager] createDirectoryAtPath:newPath withIntermediateDirectories:YES attributes:nil error:&error];
-                if (error) {
-                    // 创建错误，将错误返回
-                    NSLog(@"创建cache字目录错误: %@", error);
-                    self.callback(@[@{@"error": error.localizedFailureReason}]);
-                    return;
-                }
-            }
-            // 拼接图片路径
-            path = [newPath stringByAppendingPathComponent:fileName];
-        } else {
-            // 如果path不存在，直接保存到caches文件夹中
-            path = [cache stringByAppendingPathComponent:fileName];
-        }
+    // 创建图片路径
+    _path = [self creatImgPathWithFileName:fileName];
+    if (!_path) {
+        return;  // 路径出错
     }
     
-    // 创建返回对象
-    NSMutableDictionary *response = [[NSMutableDictionary alloc] init];
+    
+    
     UIImage *image;
     if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
         image = [info objectForKey:UIImagePickerControllerEditedImage];
@@ -158,13 +145,33 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
         UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), NULL);
     }
     
+    // 获取原始图片信息
+    _oldExifDic = [self getExifDataFromMediaInfo:info];
+    
+    // 处理图片
     image = [self fixOrientation:image]; // 旋转照片
     
-    // 获取原始图片信息
-    NSDictionary *oDic = [self getExifDataFromMediaInfo:info];
+    // 是否裁剪照片
+    if (([[self.options objectForKey:@"cropping"] boolValue])) {
+        CaptureViewController *captureView = [[CaptureViewController alloc] init];
+        captureView.image = image;
+        
+        // 裁剪设置项
+        NSDictionary *cropOptions = [self.options objectForKey:@"cropOptions"];
+        if (cropOptions && [cropOptions isKindOfClass:[NSDictionary class]]) {
+            captureView.cropOptions = cropOptions;
+        }
+        
+        [picker pushViewController:captureView animated:YES];
+        return;
+    }
+    
+    // 创建返回对象
+    NSMutableDictionary *response = [[NSMutableDictionary alloc] init];
     
     // 创建返回exif信息的对象
-    NSMutableDictionary *exifDic = [NSMutableDictionary dictionaryWithDictionary:oDic];
+    NSMutableDictionary *exifDic = [NSMutableDictionary dictionaryWithDictionary:_oldExifDic];
+    
     
     // 压缩图片
     // 按最大宽高比来压缩图片
@@ -185,9 +192,10 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
     else {
         data = UIImageJPEGRepresentation(image, [[self.options valueForKey:@"quality"] floatValue]);
     }
+    
     // 将图片信息写入文件中
-    [data writeToFile:path atomically:YES];
-    NSURL *fileURL = [NSURL fileURLWithPath:path];
+    [data writeToFile:_path atomically:YES];
+    NSURL *fileURL = [NSURL fileURLWithPath:_path];
     
     // 获取压缩后的图片的exif信息
     NSDictionary *nDic = [self getExifDataFromImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:fileURL]]];
@@ -212,7 +220,7 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
         NSDictionary *storageOptions = [self.options objectForKey:@"storageOptions"];
         
         if ([[storageOptions objectForKey:@"skipBackup"] boolValue]) {
-            [self addSkipBackupAttributeToItemAtPath:path];  // 跳过iCloud备份
+            [self addSkipBackupAttributeToItemAtPath:_path];  // 跳过iCloud备份
         }
     }
     // 照相结束 回调数据
@@ -226,6 +234,8 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
     dispatch_async(dispatch_get_main_queue(), ^{
         [picker dismissViewControllerAnimated:YES completion:^{
             self.callback(@[@{@"didCancel": @YES}]);
+            [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropOK" object:nil];
+            [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropCancel" object:nil];
         }];
     });
 }
@@ -237,6 +247,111 @@ RCT_EXPORT_METHOD(phoneFromCamera:(NSDictionary *)options callback:(RCTResponseS
     }else{
 //        NSLog(@"保存失败");
     }
+}
+
+
+#pragma mark-保存图片-
+- (NSString *)creatImgPathWithFileName:(NSString *)fileName {
+    // 默认保存tmp文件夹
+    NSString *path = [[NSTemporaryDirectory()stringByStandardizingPath] stringByAppendingPathComponent:fileName];
+    
+    if ([self.options objectForKey:@"storageOptions"] && [[self.options objectForKey:@"storageOptions"] isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *storageOptions = [self.options objectForKey:@"storageOptions"];
+        
+        //获取cache的路径
+        NSString *cache = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject];
+        
+        // 对path的值进行判断， path表示在外部规定图片存储的位置
+        if ([storageOptions objectForKey:@"path"]) {
+            // 如果path存在，在caches中创建文件夹路径
+            NSString *newPath = [cache stringByAppendingPathComponent:[storageOptions objectForKey:@"path"]];
+            NSError *error;
+            // 创建文件夹，如果文件夹存在，不需要创建
+            if (![[NSFileManager defaultManager] fileExistsAtPath:newPath]) {
+                [[NSFileManager defaultManager] createDirectoryAtPath:newPath withIntermediateDirectories:YES attributes:nil error:&error];
+                if (error) {
+                    // 创建错误，将错误返回
+                    NSLog(@"创建cache子目录错误: %@", error);
+                    self.callback(@[@{@"error": error.localizedFailureReason}]);
+                    return nil;
+                }
+            }
+            // 拼接图片路径
+            path = [newPath stringByAppendingPathComponent:fileName];
+        } else {
+            // 如果path不存在，直接保存到caches文件夹中
+            path = [cache stringByAppendingPathComponent:fileName];
+        }
+    }
+    return path;
+}
+
+
+- (void)cropCancelNotificationHandler:(NSNotification *)notification {
+//    [_picker takePicture];
+    [_picker dismissViewControllerAnimated:YES completion:^{
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropOK" object:nil];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropCancel" object:nil];
+        self.callback(@[@{@"didCancel": @YES}]);
+    }];
+}
+
+- (void)cropOKNotificationHandler:(NSNotification *)notification {
+//    notification.object;
+    UIImage *image = (UIImage *)notification.object;
+    
+    // 创建返回对象
+    NSMutableDictionary *response = [[NSMutableDictionary alloc] init];
+    
+    // 创建返回exif信息的对象
+    NSMutableDictionary *exifDic = [NSMutableDictionary dictionaryWithDictionary:_oldExifDic];
+    
+    // 按像素率来压缩
+    NSData *data;
+    if ([[self.options objectForKey:@"imageFileType"] isEqualToString:@"png"]) {
+        data = UIImagePNGRepresentation(image);
+    }
+    else {
+        data = UIImageJPEGRepresentation(image, [[self.options valueForKey:@"quality"] floatValue]);
+    }
+    
+    // 将图片信息写入文件中
+    [data writeToFile:_path atomically:YES];
+    NSURL *fileURL = [NSURL fileURLWithPath:_path];
+    
+    // 获取压缩后的图片的exif信息
+    NSDictionary *nDic = [self getExifDataFromImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:fileURL]]];
+    // 将信息追加到exifDic中
+    [exifDic addEntriesFromDictionary:nDic];
+    
+    [response setObject:exifDic forKey:@"exif"];
+    
+    NSString *filePath = [fileURL absoluteString];
+    [response setObject:filePath forKey:@"uri"];
+    [response setObject:@(image.size.width) forKey:@"width"];
+    [response setObject:@(image.size.height) forKey:@"height"];
+    NSNumber *fileSizeValue = nil;
+    NSError *fileSizeError = nil;
+    [fileURL getResourceValue:&fileSizeValue forKey:NSURLFileSizeKey error:&fileSizeError];
+    if (fileSizeValue){
+        [response setObject:fileSizeValue forKey:@"fileSize"];
+    }
+    
+    // 是否备份到iclod
+    if ([self.options objectForKey:@"storageOptions"] && [[self.options objectForKey:@"storageOptions"] isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *storageOptions = [self.options objectForKey:@"storageOptions"];
+        
+        if ([[storageOptions objectForKey:@"skipBackup"] boolValue]) {
+            [self addSkipBackupAttributeToItemAtPath:_path];  // 跳过iCloud备份
+        }
+    }
+    // 照相结束 回调数据
+    self.callback(@[response]);
+    // 退出照相机页面
+    [_picker dismissViewControllerAnimated:YES completion:^{
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropOK" object:nil];
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:@"CropCancel" object:nil];
+    }];
 }
 
 
