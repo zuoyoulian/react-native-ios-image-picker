@@ -203,7 +203,6 @@ class choosePhoto extends Component {
 
 	  return (
 	      <View style={styles.container}>
-          <Text>照片</Text>
 	        <TouchableOpacity onPress={this.showActionSheet.bind(this)}>
 	          <View style={[styles.avatar, styles.avatarContainer, {marginBottom: 20}]}>
 	          { this.state.avatarSource === null ? <Text>选取照片</Text> :
